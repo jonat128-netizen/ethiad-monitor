@@ -93,11 +93,11 @@ def check_reservation(code, name):
                 browser.close()
                 return {"status": "error", "detail": "Champs introuvables"}
 
-            # Taper directement sur l élément (press_sequentially = vrai clavier React)
-            ref_input.press_sequentially(code.upper(), delay=80)
+            # Taper directement sur l élément
+            ref_input.type(code.upper(), delay=80)
             page.wait_for_timeout(500)
 
-            name_input.press_sequentially(name.upper(), delay=80)
+            name_input.type(name.upper(), delay=80)
             page.wait_for_timeout(500)
 
             log.info(f"Champs remplis pour {code} / {name}")
