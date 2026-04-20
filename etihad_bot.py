@@ -85,30 +85,36 @@ def check_reservation(code, name):
             
             page.wait_for_timeout(1000)
 
-            # Remplir via Playwright focus/type (simule vrai clavier)
+            # Remplir directement sur les éléments
             ref_input = page.query_selector('#bookingReference')
             name_input = page.query_selector('#lastName')
 
-            # Focus + type caractère par caractère comme un humain
-            page.evaluate("document.querySelector('#bookingReference').focus()")
-            page.wait_for_timeout(300)
-            page.keyboard.type(code.upper(), delay=80)
-            page.wait_for_timeout(300)
+            if not ref_input or not name_input:
+                browser.close()
+                return {"status": "error", "detail": "Champs introuvables"}
 
-            page.evaluate("document.querySelector('#lastName').focus()")
-            page.wait_for_timeout(300)
-            page.keyboard.type(name.upper(), delay=80)
+            # Taper directement sur l élément (press_sequentially = vrai clavier React)
+            ref_input.press_sequentially(code.upper(), delay=80)
             page.wait_for_timeout(500)
 
-            log.info(f"Champs tapés clavier pour {code} / {name}")
+            name_input.press_sequentially(name.upper(), delay=80)
+            page.wait_for_timeout(500)
 
-            # Cliquer le bouton Search via JS
-            page.evaluate("""
-                var btn = document.querySelector('button[aria-label="Search"]');
-                if (btn) { btn.click(); }
-                else { console.log('bouton pas trouvé'); }
-            """)
-            log.info(f"Bouton Search cliqué pour {code} / {name}")
+            log.info(f"Champs remplis pour {code} / {name}")
+
+            # Vérifier que les champs sont bien remplis
+            ref_val = page.evaluate("document.querySelector('#bookingReference').value")
+            name_val = page.evaluate("document.querySelector('#lastName').value")
+            log.info(f"Valeurs dans les champs: ref={ref_val}, name={name_val}")
+
+            # Cliquer le bouton Search
+            search_btn = page.query_selector('button[aria-label="Search"]')
+            if search_btn:
+                search_btn.click()
+                log.info(f"Bouton Search cliqué")
+            else:
+                name_input.press("Enter")
+                log.info(f"Fallback Enter")
 
             # Attendre que l URL change vers digital.etihad.com
             try:
