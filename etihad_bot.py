@@ -490,6 +490,11 @@ def auto_check_job(ctx):
 
 def main():
     print("✈️  ETIHAD MONITOR v5 (Playwright) — Démarrage...")
+    # Installer Chromium automatiquement au démarrage
+    import subprocess
+    print("📥 Installation de Chromium...")
+    subprocess.run(["python", "-m", "playwright", "install", "chromium"], check=True)
+    print("✅ Chromium installé !")
     updater = Updater(token=BOT_TOKEN)
     dp = updater.dispatcher
 
