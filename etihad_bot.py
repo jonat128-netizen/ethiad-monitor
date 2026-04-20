@@ -97,10 +97,16 @@ def check_reservation(code, name):
             name_input.press("Enter")
             log.info(f"Formulaire soumis pour {code} / {name}")
 
-            # Attendre simplement que la page se charge sans bloquer
-            page.wait_for_timeout(10000)
+            # Attendre que l URL change vers digital.etihad.com
+            try:
+                page.wait_for_url("*digital.etihad.com*", timeout=20000)
+                log.info(f"URL changée vers: {page.url}")
+            except:
+                log.info(f"URL pas changée vers digital.etihad.com, URL actuelle: {page.url}")
+
+            # Attendre que le contenu JS se charge
+            page.wait_for_timeout(5000)
             page_text_after = page.inner_text("body").lower()
-            log.info(f"URL après soumission: {page.url}")
             log.info(f"Texte après soumission ({len(page_text_after)} chars): {page_text_after[:500]}")
 
             # Attendre la réponse
