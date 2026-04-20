@@ -85,39 +85,32 @@ def check_reservation(code, name):
             
             page.wait_for_timeout(1000)
 
-            ref_input = page.query_selector('#bookingReference')
-            name_input = page.query_selector('#lastName')
+            # Remplir les champs via JavaScript directement (bypass React)
+            page.evaluate(f"""
+                var refInput = document.querySelector('#bookingReference');
+                var nameInput = document.querySelector('#lastName');
+                if (refInput) {{
+                    var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    nativeInputValueSetter.call(refInput, '{code.upper()}');
+                    refInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    refInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+                if (nameInput) {{
+                    var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    nativeInputValueSetter.call(nameInput, '{name.upper()}');
+                    nameInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    nameInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+            """)
+            log.info(f"Champs remplis via JS pour {code} / {name}")
+            page.wait_for_timeout(1000)
 
-            if not ref_input or not name_input:
-                browser.close()
-                return {"status": "error", "detail": "Formulaire introuvable"}
-
-            # Scroller vers le formulaire
-            ref_input.scroll_into_view_if_needed()
-            page.wait_for_timeout(500)
-
-            # Remplir les champs
-            ref_input.click()
-            page.wait_for_timeout(300)
-            ref_input.fill(code.upper())
-            page.wait_for_timeout(300)
-
-            name_input.click()
-            page.wait_for_timeout(300)
-            name_input.fill(name.upper())
-            page.wait_for_timeout(500)
-
-            # Cliquer le bouton Search
-            try:
-                search_btn = page.wait_for_selector('button[aria-label="Search"]', state="attached", timeout=15000)
-                search_btn.scroll_into_view_if_needed()
-                page.wait_for_timeout(300)
-                search_btn.click()
-                log.info(f"Bouton Search cliqué pour {code} / {name}")
-            except:
-                # Fallback : Entrée
-                name_input.press("Enter")
-                log.info(f"Fallback Entrée pour {code} / {name}")
+            # Cliquer le bouton Search via JavaScript
+            page.evaluate("""
+                var btn = document.querySelector('button[aria-label="Search"]');
+                if (btn) { btn.click(); }
+            """)
+            log.info(f"Bouton Search cliqué via JS pour {code} / {name}")
 
             # Attendre que l URL change vers digital.etihad.com
             try:
