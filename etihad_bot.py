@@ -81,13 +81,13 @@ def check_reservation(code, name):
             "Accept-Language": "fr-FR,fr;q=0.9",
             "Referer": "https://www.etihad.com/fr-fr/manage",
         }
-        session.get("https://www.etihad.com/fr-fr/manage", headers=headers, timeout=15)
+        session.get("https://www.etihad.com/fr-fr/manage", headers=headers, timeout=30)
         time.sleep(random.uniform(1, 3))
         response = session.post(
             "https://www.etihad.com/api/manage/retrieve-booking",
             json={"bookingReference": code.upper(), "lastName": name.upper()},
             headers={**headers, "Content-Type": "application/json"},
-            timeout=15
+            timeout=30
         )
         if response.status_code == 200:
             data = response.json()
@@ -110,7 +110,7 @@ def check_reservation(code, name):
             return {"status": "not_found", "detail": "Réservation introuvable", "checkin_open": False}
         elif response.status_code == 404:
             return {"status": "not_found", "detail": "Réservation introuvable", "checkin_open": False}
-        resp2 = session.get(f"https://www.etihad.com/fr-fr/manage?ref={code}&lastName={name}", headers=headers, timeout=15)
+        resp2 = session.get(f"https://www.etihad.com/fr-fr/manage?ref={code}&lastName={name}", headers=headers, timeout=30)
         soup = BeautifulSoup(resp2.text, "html.parser")
         txt = soup.get_text().lower()
         if any(k in txt for k in ["introuvable", "not found", "invalide"]):
