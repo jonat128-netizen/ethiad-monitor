@@ -188,7 +188,13 @@ def check_all(bot, chat_id=None, silent=False):
     if not silent:
         bot.send_message(chat_id=chat_id, text=f"🔍 Vérification de {len(data)} réservation(s)...\n⏱ {now}")
 
-    for code, info in data.items():
+    for i, (code, info) in enumerate(data.items()):
+        # Délai aléatoire entre chaque résa pour ne pas spammer Etihad
+        if i > 0:
+            delay = random.randint(120, 300)  # 2 à 5 minutes entre chaque
+            log.info(f"Attente {delay}s avant prochaine vérification...")
+            time.sleep(delay)
+
         result = check_reservation(code, info["name"])
         prev = info.get("status", "unknown")
         new  = result["status"]
