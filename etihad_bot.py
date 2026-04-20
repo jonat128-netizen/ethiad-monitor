@@ -74,13 +74,23 @@ def check_reservation(code, name):
             inputs = page.query_selector_all("input")
             log.info(f"Nombre d inputs trouvés: {len(inputs)}")
 
-            # On connait les IDs exacts grâce aux logs
+            # Attendre que le formulaire soit visible
+            try:
+                page.wait_for_selector('#bookingReference', timeout=15000)
+            except:
+                browser.close()
+                return {"status": "error", "detail": "Formulaire pas chargé — site Etihad lent"}
+
             ref_input = page.query_selector('#bookingReference')
             name_input = page.query_selector('#lastName')
 
             if not ref_input or not name_input:
                 browser.close()
-                return {"status": "error", "detail": "Formulaire introuvable — site Etihad lent"}
+                return {"status": "error", "detail": "Formulaire introuvable"}
+
+            # Scroller vers le formulaire
+            ref_input.scroll_into_view_if_needed()
+            page.wait_for_timeout(500)
 
             # Remplir les champs
             ref_input.click()
@@ -93,10 +103,17 @@ def check_reservation(code, name):
             name_input.fill(name.upper())
             page.wait_for_timeout(500)
 
-            # Cliquer le bouton Search (aria-label="Search")
-            search_btn = page.wait_for_selector('button[aria-label="Search"]', timeout=10000)
-            search_btn.click()
-            log.info(f"Bouton Search cliqué pour {code} / {name}")
+            # Cliquer le bouton Search
+            try:
+                search_btn = page.wait_for_selector('button[aria-label="Search"]', timeout=10000)
+                search_btn.scroll_into_view_if_needed()
+                page.wait_for_timeout(300)
+                search_btn.click()
+                log.info(f"Bouton Search cliqué pour {code} / {name}")
+            except:
+                # Fallback : Entrée
+                name_input.press("Enter")
+                log.info(f"Fallback Entrée pour {code} / {name}")
 
             # Attendre que l URL change vers digital.etihad.com
             try:
