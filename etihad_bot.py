@@ -63,8 +63,8 @@ def check_reservation(code, name):
             log.info(f"Vérification {code} / {name}...")
 
             # Attendre que la page charge complètement avec le JS
-            page.goto("https://www.etihad.com/fr-fr/manage", wait_until="networkidle", timeout=40000)
-            page.wait_for_timeout(4000)  # Attendre le JS
+            page.goto("https://www.etihad.com/fr-fr/manage", wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_timeout(3000)  # Attendre le JS
 
             # Prendre screenshot pour debug
             page_text_before = page.inner_text("body").lower()
