@@ -493,7 +493,7 @@ def main():
     # Installer Chromium automatiquement au démarrage
     import subprocess
     print("📥 Installation de Chromium...")
-    subprocess.run(["python", "-m", "playwright", "install", "chromium"], check=True)
+    subprocess.run(["python", "-m", "playwright", "install", "--with-deps", "chromium"], check=True)
     print("✅ Chromium installé !")
     updater = Updater(token=BOT_TOKEN)
     dp = updater.dispatcher
