@@ -93,19 +93,20 @@ def check_reservation(code, name):
             name_input.fill(name.upper())
             page.wait_for_timeout(500)
 
-            # Soumettre avec Entrée
-            name_input.press("Enter")
-            log.info(f"Formulaire soumis pour {code} / {name}")
+            # Cliquer le bouton Search (aria-label="Search")
+            search_btn = page.wait_for_selector('button[aria-label="Search"]', timeout=10000)
+            search_btn.click()
+            log.info(f"Bouton Search cliqué pour {code} / {name}")
 
             # Attendre que l URL change vers digital.etihad.com
             try:
                 page.wait_for_url("*digital.etihad.com*", timeout=20000)
-                log.info(f"URL changée vers: {page.url}")
+                log.info(f"✅ URL changée vers: {page.url}")
             except:
-                log.info(f"URL pas changée vers digital.etihad.com, URL actuelle: {page.url}")
+                log.info(f"⚠️ URL pas changée, actuelle: {page.url}")
 
-            # Attendre que le contenu JS se charge
-            page.wait_for_timeout(5000)
+            # Attendre que le contenu JS charge
+            page.wait_for_timeout(6000)
             page_text_after = page.inner_text("body").lower()
             log.info(f"Texte après soumission ({len(page_text_after)} chars): {page_text_after[:500]}")
 
