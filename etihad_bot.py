@@ -93,16 +93,24 @@ def check_reservation(code, name):
             name_input.fill(name.upper())
             page.wait_for_timeout(500)
 
-            # Soumettre avec Entrée (plus fiable que cliquer le bouton)
+            # Soumettre avec Entrée
             name_input.press("Enter")
             log.info(f"Formulaire soumis pour {code} / {name}")
 
-            # Attendre la réponse
-            page.wait_for_timeout(8000)
-            page_text = page.inner_text("body").lower()
-            browser.close()
+            # Attendre que l URL change (signe que la page a bien chargé)
+            try:
+                page.wait_for_url("**/manage/**", timeout=15000)
+                log.info(f"URL changée : {page.url}")
+            except:
+                log.info("URL pas changée, on attend quand même...")
 
-            log.info(f"Résultat page après soumission, longueur: {len(page_text)}")
+            page.wait_for_timeout(5000)
+            page_text_after = page.inner_text("body").lower()
+            log.info(f"Texte après soumission ({len(page_text_after)} chars): {page_text_after[:300]}")
+
+            # Attendre la réponse
+            page_text = page_text_after
+            browser.close()
 
             # Mots clés erreur SPÉCIFIQUES à la page de résultat
             error_kw = [
