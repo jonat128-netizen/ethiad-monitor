@@ -132,36 +132,40 @@ def check_reservation(code, name):
             page_text = page_text_after
             browser.close()
 
-            # Mots clés erreur SPÉCIFIQUES à la page de résultat
+            # Mots clés erreur
             error_kw = [
                 "introuvable", "not found", "invalide", "incorrect",
-                "aucune réservation", "no booking found", "we couldn",
-                "unable to find", "could not find", "booking not found",
-                "référence de réservation incorrecte", "incorrect booking"
+                "aucune réservation", "no booking found", "unable to find",
+                "could not find", "booking not found", "référence de réservation incorrecte"
             ]
 
-            # Mots clés succès SPÉCIFIQUES (présents seulement sur la page de résa)
+            # Mots clés succès — basés sur ce qu on voit vraiment sur la page
             success_kw = [
-                "itinéraire", "itinerary", "vol prévu", "scheduled flight",
-                "carte d'embarquement", "boarding pass", "numéro de vol",
-                "flight number", "passager", "passenger name",
-                "modifier mon vol", "change flight", "annuler", "cancel booking"
+                "référence de voyage", "voyage à destination",
+                "informations de vol", "direct", "terminal",
+                "adulte", "modification", "etihad"
             ]
 
             if any(k in page_text for k in error_kw):
                 return {"status": "not_found", "detail": "Réservation introuvable sur Etihad"}
 
             if any(k in page_text for k in success_kw):
-                checkin_open = "check-in" in page_text and ("disponible" in page_text or "available" in page_text)
-                checkin_done = "enregistré" in page_text or "checked in" in page_text or "boarding pass" in page_text
-                detail = "Réservation confirmée"
+                checkin_done = "déjà enregistré" in page_text or "already checked in" in page_text or "carte d'embarquement" in page_text
+                checkin_open = ("enregistrement" in page_text or "check-in" in page_text) and not checkin_done
+
+                # Extraire destination si possible
+                detail = "Réservation confirmée ✅"
+                if "voyage à destination de" in page_text:
+                    idx = page_text.find("voyage à destination de")
+                    dest = page_text[idx+23:idx+50].strip().split("\n")[0].title()
+                    detail = f"Réservation confirmée ✅ — {dest}"
                 if checkin_done:
-                    detail = "Réservation confirmée ✅ Check-in effectué"
+                    detail += " — Check-in effectué ✈️"
                 elif checkin_open:
-                    detail = "Réservation confirmée 🛫 Check-in disponible !"
+                    detail += " — 🛫 Check-in disponible !"
+
                 return {"status": "confirmed", "detail": detail, "checkin_open": checkin_open, "checkin_done": checkin_done}
 
-            # Si on ne trouve ni erreur ni succès clair → indéterminé
             return {"status": "error", "detail": "Résultat indéterminé — réessaie plus tard"}
 
     except Exception as e:
