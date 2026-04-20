@@ -61,85 +61,113 @@ def check_reservation(code, name):
             page = context.new_page()
 
             log.info(f"Vérification {code} / {name}...")
-            page.goto("https://www.etihad.com/fr-fr/manage", wait_until="networkidle", timeout=30000)
-            page.wait_for_timeout(2000)
 
-            # Chercher le champ code réservation
+            # Attendre que la page charge complètement avec le JS
+            page.goto("https://www.etihad.com/fr-fr/manage", wait_until="networkidle", timeout=40000)
+            page.wait_for_timeout(4000)  # Attendre le JS
+
+            # Prendre screenshot pour debug
+            page_text_before = page.inner_text("body").lower()
+            log.info(f"Page chargée, longueur texte: {len(page_text_before)}")
+
+            # Chercher tous les inputs visibles
+            inputs = page.query_selector_all("input")
+            log.info(f"Nombre d inputs trouvés: {len(inputs)}")
+
             ref_input = None
-            for sel in [
-                'input[name="bookingReference"]',
-                'input[placeholder*="référence"]',
-                'input[placeholder*="réservation"]',
-                'input[placeholder*="booking"]',
-                'input[id*="booking"]',
-                'input[id*="reference"]',
-            ]:
+            name_input = None
+
+            for inp in inputs:
                 try:
-                    el = page.wait_for_selector(sel, timeout=3000)
-                    if el:
-                        ref_input = el
-                        break
+                    attrs = {
+                        "name": inp.get_attribute("name") or "",
+                        "placeholder": inp.get_attribute("placeholder") or "",
+                        "id": inp.get_attribute("id") or "",
+                        "type": inp.get_attribute("type") or "",
+                    }
+                    combined = " ".join(attrs.values()).lower()
+                    log.info(f"Input trouvé: {attrs}")
+
+                    if any(k in combined for k in ["booking", "reference", "reservation", "pnr", "réservation"]):
+                        ref_input = inp
+                    elif any(k in combined for k in ["lastname", "last_name", "surname", "nom", "name"]):
+                        name_input = inp
                 except:
                     pass
+
+            if not ref_input or not name_input:
+                log.info("Formulaire pas encore visible, attente supplémentaire...")
+                page.wait_for_timeout(5000)
+                inputs = page.query_selector_all("input:visible")
+                log.info(f"Inputs visibles après attente: {len(inputs)}")
+
+                if len(inputs) >= 2:
+                    ref_input = inputs[0]
+                    name_input = inputs[1]
 
             if not ref_input:
                 browser.close()
-                return {"status": "error", "detail": "Formulaire introuvable sur la page"}
+                return {"status": "error", "detail": "Formulaire introuvable — site Etihad lent"}
 
+            # Remplir et soumettre
+            ref_input.click()
             ref_input.fill(code.upper())
+            page.wait_for_timeout(500)
 
-            # Chercher le champ nom
-            name_input = None
-            for sel in [
-                'input[name="lastName"]',
-                'input[placeholder*="nom"]',
-                'input[placeholder*="name"]',
-                'input[id*="lastName"]',
-                'input[id*="surname"]',
-            ]:
-                try:
-                    el = page.wait_for_selector(sel, timeout=3000)
-                    if el:
-                        name_input = el
-                        break
-                except:
-                    pass
-
-            if not name_input:
-                browser.close()
-                return {"status": "error", "detail": "Champ nom introuvable"}
-
+            name_input.click()
             name_input.fill(name.upper())
+            page.wait_for_timeout(500)
 
-            # Soumettre
+            # Appuyer sur Entrée ou chercher bouton submit
+            submitted = False
             for sel in [
                 'button[type="submit"]',
                 'button:has-text("Rechercher")',
-                'button:has-text("Gérer")',
-                'button:has-text("Trouver")',
                 'button:has-text("Find")',
+                'button:has-text("Manage")',
+                'button:has-text("Gérer")',
+                '[type="submit"]',
             ]:
                 try:
-                    btn = page.wait_for_selector(sel, timeout=2000)
-                    if btn:
+                    btn = page.query_selector(sel)
+                    if btn and btn.is_visible():
                         btn.click()
+                        submitted = True
                         break
                 except:
                     pass
 
-            page.wait_for_timeout(5000)
+            if not submitted:
+                name_input.press("Enter")
+
+            # Attendre la réponse
+            page.wait_for_timeout(8000)
             page_text = page.inner_text("body").lower()
             browser.close()
 
-            # Analyser le résultat
-            error_kw  = ["introuvable", "not found", "invalide", "incorrect", "aucune réservation", "no booking found"]
-            success_kw = ["vol", "flight", "départ", "destination", "passager", "siège", "itinéraire", "bagage", "check-in"]
+            log.info(f"Résultat page après soumission, longueur: {len(page_text)}")
+
+            # Mots clés erreur SPÉCIFIQUES à la page de résultat
+            error_kw = [
+                "introuvable", "not found", "invalide", "incorrect",
+                "aucune réservation", "no booking found", "we couldn",
+                "unable to find", "could not find", "booking not found",
+                "référence de réservation incorrecte", "incorrect booking"
+            ]
+
+            # Mots clés succès SPÉCIFIQUES (présents seulement sur la page de résa)
+            success_kw = [
+                "itinéraire", "itinerary", "vol prévu", "scheduled flight",
+                "carte d'embarquement", "boarding pass", "numéro de vol",
+                "flight number", "passager", "passenger name",
+                "modifier mon vol", "change flight", "annuler", "cancel booking"
+            ]
 
             if any(k in page_text for k in error_kw):
                 return {"status": "not_found", "detail": "Réservation introuvable sur Etihad"}
+
             if any(k in page_text for k in success_kw):
-                # Chercher infos check-in
-                checkin_open = "check-in" in page_text and ("disponible" in page_text or "available" in page_text or "open" in page_text)
+                checkin_open = "check-in" in page_text and ("disponible" in page_text or "available" in page_text)
                 checkin_done = "enregistré" in page_text or "checked in" in page_text or "boarding pass" in page_text
                 detail = "Réservation confirmée"
                 if checkin_done:
@@ -148,7 +176,8 @@ def check_reservation(code, name):
                     detail = "Réservation confirmée 🛫 Check-in disponible !"
                 return {"status": "confirmed", "detail": detail, "checkin_open": checkin_open, "checkin_done": checkin_done}
 
-            return {"status": "error", "detail": "Résultat indéterminé"}
+            # Si on ne trouve ni erreur ni succès clair → indéterminé
+            return {"status": "error", "detail": "Résultat indéterminé — réessaie plus tard"}
 
     except Exception as e:
         log.error(f"Erreur Playwright {code}: {e}")
