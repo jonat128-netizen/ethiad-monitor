@@ -134,9 +134,14 @@ def check_reservation(code, name):
 
             # Mots clés erreur
             error_kw = [
+                "unable to find a booking",
+                "we're unable to find",
+                "we are unable to find",
+                "please check and try again",
                 "introuvable", "not found", "invalide", "incorrect",
-                "aucune réservation", "no booking found", "unable to find",
-                "could not find", "booking not found", "référence de réservation incorrecte"
+                "aucune réservation", "no booking found",
+                "could not find", "booking not found",
+                "référence de réservation incorrecte"
             ]
 
             # Mots clés succès — basés sur ce qu on voit vraiment sur la page
