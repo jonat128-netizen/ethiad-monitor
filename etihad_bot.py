@@ -74,71 +74,28 @@ def check_reservation(code, name):
             inputs = page.query_selector_all("input")
             log.info(f"Nombre d inputs trouvés: {len(inputs)}")
 
-            ref_input = None
-            name_input = None
-
-            for inp in inputs:
-                try:
-                    attrs = {
-                        "name": inp.get_attribute("name") or "",
-                        "placeholder": inp.get_attribute("placeholder") or "",
-                        "id": inp.get_attribute("id") or "",
-                        "type": inp.get_attribute("type") or "",
-                    }
-                    combined = " ".join(attrs.values()).lower()
-                    log.info(f"Input trouvé: {attrs}")
-
-                    if any(k in combined for k in ["booking", "reference", "reservation", "pnr", "réservation"]):
-                        ref_input = inp
-                    elif any(k in combined for k in ["lastname", "last_name", "surname", "nom", "name"]):
-                        name_input = inp
-                except:
-                    pass
+            # On connait les IDs exacts grâce aux logs
+            ref_input = page.query_selector('#bookingReference')
+            name_input = page.query_selector('#lastName')
 
             if not ref_input or not name_input:
-                log.info("Formulaire pas encore visible, attente supplémentaire...")
-                page.wait_for_timeout(5000)
-                inputs = page.query_selector_all("input:visible")
-                log.info(f"Inputs visibles après attente: {len(inputs)}")
-
-                if len(inputs) >= 2:
-                    ref_input = inputs[0]
-                    name_input = inputs[1]
-
-            if not ref_input:
                 browser.close()
                 return {"status": "error", "detail": "Formulaire introuvable — site Etihad lent"}
 
-            # Remplir et soumettre
+            # Remplir les champs
             ref_input.click()
+            page.wait_for_timeout(300)
             ref_input.fill(code.upper())
-            page.wait_for_timeout(500)
+            page.wait_for_timeout(300)
 
             name_input.click()
+            page.wait_for_timeout(300)
             name_input.fill(name.upper())
             page.wait_for_timeout(500)
 
-            # Appuyer sur Entrée ou chercher bouton submit
-            submitted = False
-            for sel in [
-                'button[type="submit"]',
-                'button:has-text("Rechercher")',
-                'button:has-text("Find")',
-                'button:has-text("Manage")',
-                'button:has-text("Gérer")',
-                '[type="submit"]',
-            ]:
-                try:
-                    btn = page.query_selector(sel)
-                    if btn and btn.is_visible():
-                        btn.click()
-                        submitted = True
-                        break
-                except:
-                    pass
-
-            if not submitted:
-                name_input.press("Enter")
+            # Soumettre avec Entrée (plus fiable que cliquer le bouton)
+            name_input.press("Enter")
+            log.info(f"Formulaire soumis pour {code} / {name}")
 
             # Attendre la réponse
             page.wait_for_timeout(8000)
