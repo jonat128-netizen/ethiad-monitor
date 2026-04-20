@@ -76,15 +76,14 @@ def check_reservation(code, name):
             inputs = page.query_selector_all("input")
             log.info(f"Nombre d inputs trouvés: {len(inputs)}")
 
-            # Attendre que le formulaire soit visible et interactif
+            # Attendre que le formulaire soit dans le DOM
             try:
-                page.wait_for_selector('#bookingReference', state="visible", timeout=15000)
-                page.wait_for_selector('#bookingReference', state="attached", timeout=5000)
+                page.wait_for_selector('#bookingReference', state="attached", timeout=15000)
             except:
                 browser.close()
                 return {"status": "error", "detail": "Formulaire pas chargé — site Etihad lent"}
             
-            page.wait_for_timeout(2000)  # Laisser le JS finir
+            page.wait_for_timeout(1000)
 
             ref_input = page.query_selector('#bookingReference')
             name_input = page.query_selector('#lastName')
@@ -110,7 +109,7 @@ def check_reservation(code, name):
 
             # Cliquer le bouton Search
             try:
-                search_btn = page.wait_for_selector('button[aria-label="Search"]', state="visible", timeout=15000)
+                search_btn = page.wait_for_selector('button[aria-label="Search"]', state="attached", timeout=15000)
                 search_btn.scroll_into_view_if_needed()
                 page.wait_for_timeout(300)
                 search_btn.click()
