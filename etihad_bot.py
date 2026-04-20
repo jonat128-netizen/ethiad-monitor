@@ -1,6 +1,6 @@
 """
-ETIHAD MONITOR — BOT TELEGRAM v2
-Compatible python-telegram-bot 13.x
+ETIHAD MONITOR — BOT TELEGRAM v3
+Avec menu boutons inline
 """
 
 import json
@@ -13,13 +13,15 @@ from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
-from telegram import Update, Bot
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, CallbackContext
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 CHAT_ID   = int(os.environ.get("CHAT_ID", "0"))
 CHECK_INTERVAL_SECONDS = 120 * 60
 STATE_FILE = "reservations.json"
+WAITING_ADD = {}
+WAITING_REMOVE = {}
 
 logging.basicConfig(format="%(asctime)s — %(levelname)s — %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -30,6 +32,10 @@ USER_AGENTS = [
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148",
 ]
 
+# ══════════════════════════════════════════
+#  DONNÉES
+# ══════════════════════════════════════════
+
 def load_data():
     if Path(STATE_FILE).exists():
         with open(STATE_FILE, "r", encoding="utf-8") as f:
@@ -39,6 +45,31 @@ def load_data():
 def save_data(data):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+
+# ══════════════════════════════════════════
+#  MENU PRINCIPAL
+# ══════════════════════════════════════════
+
+def menu_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("➕ Ajouter une résa", callback_data="add")],
+        [InlineKeyboardButton("🔍 Vérifier maintenant", callback_data="check")],
+        [InlineKeyboardButton("📋 Voir la liste", callback_data="list")],
+        [InlineKeyboardButton("🗑 Supprimer une résa", callback_data="remove")],
+        [InlineKeyboardButton("📊 Statut du bot", callback_data="status")],
+    ])
+
+def show_menu(bot, chat_id, text="Que veux-tu faire ?"):
+    bot.send_message(
+        chat_id=chat_id,
+        text=f"✈️ <b>Etihad Monitor</b>\n\n{text}",
+        parse_mode="HTML",
+        reply_markup=menu_keyboard()
+    )
+
+# ══════════════════════════════════════════
+#  VÉRIFICATION ETIHAD
+# ══════════════════════════════════════════
 
 def check_reservation(code, name):
     try:
@@ -90,15 +121,22 @@ def check_reservation(code, name):
     except Exception as e:
         return {"status": "error", "detail": str(e)[:80], "checkin_open": False}
 
-def check_all(bot, silent=False):
+# ══════════════════════════════════════════
+#  VÉRIFICATION GLOBALE
+# ══════════════════════════════════════════
+
+def check_all(bot, chat_id=None, silent=False):
+    if chat_id is None:
+        chat_id = CHAT_ID
     data = load_data()
     if not data:
         if not silent:
-            bot.send_message(chat_id=CHAT_ID, text="📋 Aucune réservation.\nUtilise /add CODE NOM pour en ajouter une.")
+            show_menu(bot, chat_id, "📋 Aucune réservation à surveiller.\nClique sur ➕ pour en ajouter une !")
         return
     now = datetime.now().strftime("%d/%m/%Y %H:%M")
     if not silent:
-        bot.send_message(chat_id=CHAT_ID, text=f"🔍 Vérification de {len(data)} réservation(s)...\n⏱ {now}")
+        bot.send_message(chat_id=chat_id, text=f"🔍 Vérification de {len(data)} réservation(s)...\n⏱ {now}")
+
     for code, info in data.items():
         result = check_reservation(code, info["name"])
         prev = info.get("status", "unknown")
@@ -106,6 +144,7 @@ def check_all(bot, silent=False):
         data[code]["status"] = new
         data[code]["last_check"] = now
         data[code]["detail"] = result["detail"]
+
         if prev == "confirmed" and new == "not_found":
             bot.send_message(chat_id=CHAT_ID, parse_mode="HTML", text=(
                 f"🚨🚨🚨 <b>ALERTE — RÉSERVATION DISPARUE !</b>\n\n"
@@ -124,94 +163,166 @@ def check_all(bot, silent=False):
                 f"👉 https://www.etihad.com/fr-fr/manage/check-in"
             ))
             data[code]["checkin_notified"] = True
+
     save_data(data)
+
     if not silent:
         lines = []
         for code, info in data.items():
             emoji = {"confirmed": "✅", "not_found": "🚨", "error": "⚠️"}.get(info["status"], "❓")
             lines.append(f"{emoji} <b>{code}</b> — {info['name']}\n    └ {info['detail']}")
-        bot.send_message(chat_id=CHAT_ID, parse_mode="HTML", text="📊 <b>Rapport</b>\n\n" + "\n\n".join(lines))
+        bot.send_message(chat_id=chat_id, parse_mode="HTML", text="📊 <b>Rapport</b>\n\n" + "\n\n".join(lines))
+        show_menu(bot, chat_id)
+
+# ══════════════════════════════════════════
+#  COMMANDES
+# ══════════════════════════════════════════
 
 def cmd_start(update, ctx):
-    update.message.reply_text(
-        "✈️ <b>Etihad Monitor</b> — Bonjour !\n\n"
-        "🚨 Alerte si une résa disparaît\n"
-        "🛫 Alerte quand le check-in est ouvert\n\n"
-        "<b>Commandes :</b>\n"
-        "• /add CODE NOM\n• /remove CODE\n• /check\n• /list\n• /status",
-        parse_mode="HTML")
+    show_menu(ctx.bot, update.effective_chat.id, "Bienvenue ! Je surveille tes réservations Etihad 24h/24 🛡")
 
-def cmd_add(update, ctx):
-    args = ctx.args
-    if len(args) < 2:
-        update.message.reply_text("❌ Usage : /add CODE NOM\nEx: /add ABC123 MARTIN")
-        return
-    code = args[0].upper()
-    name = " ".join(args[1:]).upper()
-    data = load_data()
-    if code in data:
-        update.message.reply_text(f"⚠️ {code} déjà dans la liste.")
-        return
-    data[code] = {"name": name, "status": "unknown", "last_check": "jamais",
-                  "detail": "Pas encore vérifié", "checkin_notified": False}
-    save_data(data)
-    update.message.reply_text(f"✅ Ajouté ! <b>{code}</b> — {name}", parse_mode="HTML")
+def cmd_menu(update, ctx):
+    show_menu(ctx.bot, update.effective_chat.id)
 
-def cmd_remove(update, ctx):
-    if not ctx.args:
-        update.message.reply_text("❌ Usage : /remove CODE")
-        return
-    code = ctx.args[0].upper()
-    data = load_data()
-    if code not in data:
-        update.message.reply_text(f"❌ {code} introuvable.")
-        return
-    name = data[code]["name"]
-    del data[code]
-    save_data(data)
-    update.message.reply_text(f"🗑️ <b>{code}</b> ({name}) supprimé.", parse_mode="HTML")
+# ══════════════════════════════════════════
+#  GESTION DES BOUTONS
+# ══════════════════════════════════════════
 
-def cmd_check(update, ctx):
-    update.message.reply_text("⏳ Vérification en cours...")
-    check_all(ctx.bot)
+def handle_button(update, ctx):
+    query = update.callback_query
+    query.answer()
+    chat_id = query.message.chat_id
+    data_cb = query.data
 
-def cmd_list(update, ctx):
-    data = load_data()
-    if not data:
-        update.message.reply_text("📋 Aucune réservation.")
-        return
-    lines = []
-    for code, info in data.items():
-        emoji = {"confirmed": "✅", "not_found": "🚨", "error": "⚠️", "unknown": "❓"}.get(info["status"], "❓")
-        lines.append(f"{emoji} <b>{code}</b> — {info['name']}\n    └ {info['last_check']}")
-    update.message.reply_text(f"📋 <b>{len(data)} réservation(s)</b>\n\n" + "\n\n".join(lines), parse_mode="HTML")
+    if data_cb == "add":
+        WAITING_ADD[chat_id] = "code"
+        ctx.bot.send_message(chat_id=chat_id, text=(
+            "➕ <b>Ajouter une réservation</b>\n\n"
+            "Envoie le <b>code de réservation</b>\n"
+            "Ex: <code>BTX4NJ</code>"
+        ), parse_mode="HTML")
 
-def cmd_status(update, ctx):
-    data = load_data()
-    update.message.reply_text(
-        f"🤖 <b>Statut</b>\n\n"
-        f"• Réservations : <b>{len(data)}</b>\n"
-        f"• Confirmées : <b>{sum(1 for v in data.values() if v['status']=='confirmed')}</b> ✅\n"
-        f"• Disparues : <b>{sum(1 for v in data.values() if v['status']=='not_found')}</b> 🚨\n"
-        f"• Vérification : toutes les <b>2h</b>",
-        parse_mode="HTML")
+    elif data_cb == "check":
+        ctx.bot.send_message(chat_id=chat_id, text="⏳ Vérification en cours...")
+        check_all(ctx.bot, chat_id)
+
+    elif data_cb == "list":
+        data = load_data()
+        if not data:
+            show_menu(ctx.bot, chat_id, "📋 Aucune réservation.\nClique sur ➕ pour en ajouter une !")
+            return
+        lines = []
+        for code, info in data.items():
+            emoji = {"confirmed": "✅", "not_found": "🚨", "error": "⚠️", "unknown": "❓"}.get(info["status"], "❓")
+            lines.append(f"{emoji} <b>{code}</b> — {info['name']}\n    └ Vérifié : {info['last_check']}")
+        ctx.bot.send_message(chat_id=chat_id, parse_mode="HTML",
+            text=f"📋 <b>{len(data)} réservation(s)</b>\n\n" + "\n\n".join(lines))
+        show_menu(ctx.bot, chat_id)
+
+    elif data_cb == "remove":
+        data = load_data()
+        if not data:
+            show_menu(ctx.bot, chat_id, "📋 Aucune réservation à supprimer.")
+            return
+        # Créer boutons pour chaque résa
+        buttons = []
+        for code, info in data.items():
+            buttons.append([InlineKeyboardButton(
+                f"🗑 {code} — {info['name']}", callback_data=f"del_{code}"
+            )])
+        buttons.append([InlineKeyboardButton("↩️ Retour", callback_data="back")])
+        ctx.bot.send_message(chat_id=chat_id, text="Quelle réservation supprimer ?",
+            reply_markup=InlineKeyboardMarkup(buttons))
+
+    elif data_cb.startswith("del_"):
+        code = data_cb[4:]
+        data = load_data()
+        if code in data:
+            name = data[code]["name"]
+            del data[code]
+            save_data(data)
+            show_menu(ctx.bot, chat_id, f"🗑 <b>{code}</b> ({name}) supprimé.")
+        else:
+            show_menu(ctx.bot, chat_id, "❌ Réservation introuvable.")
+
+    elif data_cb == "status":
+        data = load_data()
+        ctx.bot.send_message(chat_id=chat_id, parse_mode="HTML", text=(
+            f"📊 <b>Statut du bot</b>\n\n"
+            f"• Réservations : <b>{len(data)}</b>\n"
+            f"• Confirmées : <b>{sum(1 for v in data.values() if v['status']=='confirmed')}</b> ✅\n"
+            f"• Disparues : <b>{sum(1 for v in data.values() if v['status']=='not_found')}</b> 🚨\n"
+            f"• Vérification auto : toutes les <b>2h</b>\n"
+            f"• Heure : {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        ))
+        show_menu(ctx.bot, chat_id)
+
+    elif data_cb == "back":
+        show_menu(ctx.bot, chat_id)
+
+# ══════════════════════════════════════════
+#  GESTION DES MESSAGES TEXTE (pour /add)
+# ══════════════════════════════════════════
+
+def handle_text(update, ctx):
+    chat_id = update.effective_chat.id
+    text = update.message.text.strip().upper()
+
+    if chat_id in WAITING_ADD:
+        step = WAITING_ADD[chat_id]
+
+        if step == "code":
+            ctx.user_data["add_code"] = text
+            WAITING_ADD[chat_id] = "name"
+            update.message.reply_text(
+                f"✅ Code : <b>{text}</b>\n\nMaintenant envoie le <b>nom de famille</b> du passager\nEx: <code>MARTIN</code>",
+                parse_mode="HTML"
+            )
+
+        elif step == "name":
+            code = ctx.user_data.get("add_code", "")
+            name = text
+            data = load_data()
+            if code in data:
+                del WAITING_ADD[chat_id]
+                show_menu(ctx.bot, chat_id, f"⚠️ <b>{code}</b> est déjà dans la liste.")
+                return
+            data[code] = {
+                "name": name, "status": "unknown", "last_check": "jamais",
+                "detail": "Pas encore vérifié", "checkin_notified": False,
+                "added": datetime.now().strftime("%d/%m/%Y %H:%M")
+            }
+            save_data(data)
+            del WAITING_ADD[chat_id]
+            show_menu(ctx.bot, chat_id, f"✅ Réservation ajoutée !\n\n✈️ <b>{code}</b> — {name}\n\nClique sur 🔍 pour vérifier maintenant !")
+    else:
+        show_menu(ctx.bot, chat_id)
+
+# ══════════════════════════════════════════
+#  JOB AUTO
+# ══════════════════════════════════════════
 
 def auto_check_job(ctx):
     log.info("⏰ Vérification automatique")
     check_all(ctx.bot, silent=True)
 
+# ══════════════════════════════════════════
+#  DÉMARRAGE
+# ══════════════════════════════════════════
+
 def main():
-    print("✈️  ETIHAD MONITOR — Démarrage...")
+    print("✈️  ETIHAD MONITOR v3 — Démarrage...")
     updater = Updater(token=BOT_TOKEN)
     dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start",  cmd_start))
-    dp.add_handler(CommandHandler("add",    cmd_add))
-    dp.add_handler(CommandHandler("remove", cmd_remove))
-    dp.add_handler(CommandHandler("check",  cmd_check))
-    dp.add_handler(CommandHandler("list",   cmd_list))
-    dp.add_handler(CommandHandler("status", cmd_status))
+
+    dp.add_handler(CommandHandler("start", cmd_start))
+    dp.add_handler(CommandHandler("menu",  cmd_menu))
+    dp.add_handler(CallbackQueryHandler(handle_button))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text))
+
     updater.job_queue.run_repeating(auto_check_job, interval=CHECK_INTERVAL_SECONDS, first=60)
-    print("🟢 Bot actif !")
+
+    print("🟢 Bot actif avec menu boutons !")
     updater.start_polling()
     updater.idle()
 
