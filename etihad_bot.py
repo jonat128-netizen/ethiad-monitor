@@ -423,21 +423,26 @@ def handle_text(update, ctx):
                 f"⏳ Vérification en cours..."
             ))
 
-            # Vérification automatique immédiate
-            result = check_reservation(code, name)
-            data2 = load_data()
-            data2[code]["status"] = result["status"]
-            data2[code]["last_check"] = datetime.now().strftime("%d/%m/%Y %H:%M")
-            data2[code]["detail"] = result["detail"]
-            save_data(data2)
+            # Vérification automatique en arrière-plan
+            import threading
+            def verify_in_background(bot, code, name, chat_id):
+                result = check_reservation(code, name)
+                data2 = load_data()
+                if code in data2:
+                    data2[code]["status"] = result["status"]
+                    data2[code]["last_check"] = datetime.now().strftime("%d/%m/%Y %H:%M")
+                    data2[code]["detail"] = result["detail"]
+                    save_data(data2)
+                status_text = {
+                    "confirmed": "✅ <b>BTX4NJ confirmée !</b> Réservation valide.",
+                    "not_found": "🚨 Réservation <b>introuvable</b> sur Etihad ! Vérifie le code et le nom.",
+                    "error": "⚠️ Timeout Etihad, réessaie dans quelques minutes."
+                }.get(result["status"], "Statut inconnu")
+                show_menu(bot, chat_id, status_text.replace("BTX4NJ", code))
 
-            status_text = {
-                "confirmed": "Réservation <b>confirmée</b> ✅",
-                "not_found": "🚨 Réservation <b>introuvable</b> sur Etihad ! Vérifie le code et le nom.",
-                "error": "⚠️ Impossible de vérifier pour l instant, réessaie plus tard."
-            }.get(result["status"], "Statut inconnu")
-
-            show_menu(ctx.bot, chat_id, status_text)
+            t = threading.Thread(target=verify_in_background, args=(ctx.bot, code, name, chat_id))
+            t.daemon = True
+            t.start()
     else:
         show_menu(ctx.bot, chat_id)
 
