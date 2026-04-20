@@ -97,16 +97,11 @@ def check_reservation(code, name):
             name_input.press("Enter")
             log.info(f"Formulaire soumis pour {code} / {name}")
 
-            # Attendre que l URL change (signe que la page a bien chargé)
-            try:
-                page.wait_for_url("**/manage/**", timeout=15000)
-                log.info(f"URL changée : {page.url}")
-            except:
-                log.info("URL pas changée, on attend quand même...")
-
-            page.wait_for_timeout(5000)
+            # Attendre simplement que la page se charge sans bloquer
+            page.wait_for_timeout(10000)
             page_text_after = page.inner_text("body").lower()
-            log.info(f"Texte après soumission ({len(page_text_after)} chars): {page_text_after[:300]}")
+            log.info(f"URL après soumission: {page.url}")
+            log.info(f"Texte après soumission ({len(page_text_after)} chars): {page_text_after[:500]}")
 
             # Attendre la réponse
             page_text = page_text_after
