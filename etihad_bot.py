@@ -388,11 +388,21 @@ def handle_button(update, ctx):
                     time_ago = last_check
             else:
                 time_ago = "jamais"
+            if info.get("status") == "not_found":
+                badge = "🚨 INTROUVABLE"
+            elif info.get("checkin_done", False):
+                badge = "✈️ CHECK-IN EFFECTUÉ"
+            elif info.get("checkin_open_notified", False):
+                badge = "🛫 CHECK-IN OUVERT"
+            elif info.get("status") == "confirmed":
+                badge = "✅ CONFIRMÉE"
+            else:
+                badge = "❓ NON VÉRIFIÉ"
             lines.append(
                 f"{emoji} <b>{code}</b> — {info['name']}\n"
                 f"    └ 📅 {info.get('flight_date','?')}{delta}\n"
-                f"    └ 🕐 Vérifié {time_ago}\n"
-                f"    └ {info.get('detail','—')}"
+                f"    └ 🏷 {badge}\n"
+                f"    └ 🕐 Vérifié {time_ago}"
             )
         ctx.bot.send_message(chat_id=chat_id, parse_mode="HTML",
             text=f"📋 <b>{len(data)} réservation(s)</b>\n\n" + "\n\n".join(lines))
@@ -536,6 +546,28 @@ def handle_text(update, ctx):
 
 def auto_check_job(ctx):
     log.info("⏰ Vérification automatique")
+    # Supprimer les réservations dont le vol est passé depuis plus de 24h
+    data = load_data()
+    now = datetime.now()
+    to_delete = []
+    for code, info in data.items():
+        fd = parse_date(info.get("flight_date", ""))
+        if fd and (now - fd).total_seconds() > 86400:
+            to_delete.append((code, info["name"]))
+    for code, name in to_delete:
+        del data[code]
+        log.info(f"Résa expirée supprimée : {code}")
+        try:
+            ctx.bot.send_message(chat_id=CHAT_ID, parse_mode="HTML",
+                text="🗑️ <b>Réservation supprimée automatiquement</b>
+
+"
+                     "✈️ <b>" + code + "</b> — " + name + "
+Vol terminé — retiré de la liste.")
+        except:
+            pass
+    if to_delete:
+        save_data(data)
     check_all(ctx.bot, silent=True)
 
 # ══════════════════════════════════════════
@@ -568,3 +600,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
