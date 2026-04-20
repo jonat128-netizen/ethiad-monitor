@@ -54,11 +54,13 @@ def check_reservation(code, name):
     try:
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+            # Timeout global 60 secondes
             context = browser.new_context(
                 locale="fr-FR",
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
             )
             page = context.new_page()
+            page.set_default_timeout(60000)  # 60 secondes pour toutes les actions
 
             log.info(f"Vérification {code} / {name}...")
 
@@ -74,12 +76,15 @@ def check_reservation(code, name):
             inputs = page.query_selector_all("input")
             log.info(f"Nombre d inputs trouvés: {len(inputs)}")
 
-            # Attendre que le formulaire soit visible
+            # Attendre que le formulaire soit visible et interactif
             try:
-                page.wait_for_selector('#bookingReference', timeout=15000)
+                page.wait_for_selector('#bookingReference', state="visible", timeout=15000)
+                page.wait_for_selector('#bookingReference', state="attached", timeout=5000)
             except:
                 browser.close()
                 return {"status": "error", "detail": "Formulaire pas chargé — site Etihad lent"}
+            
+            page.wait_for_timeout(2000)  # Laisser le JS finir
 
             ref_input = page.query_selector('#bookingReference')
             name_input = page.query_selector('#lastName')
@@ -105,7 +110,7 @@ def check_reservation(code, name):
 
             # Cliquer le bouton Search
             try:
-                search_btn = page.wait_for_selector('button[aria-label="Search"]', timeout=10000)
+                search_btn = page.wait_for_selector('button[aria-label="Search"]', state="visible", timeout=15000)
                 search_btn.scroll_into_view_if_needed()
                 page.wait_for_timeout(300)
                 search_btn.click()
