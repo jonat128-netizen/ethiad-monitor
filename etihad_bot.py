@@ -493,7 +493,12 @@ def handle_text(update, ctx):
                 if result["status"] == "confirmed":
                     status_text = "✅ <b>" + code + " confirmée !</b>" + (" — " + detail if detail else "")
                 elif result["status"] == "not_found":
-                    status_text = "🚨 <b>" + code + " INTROUVABLE !</b> Cette réservation n'existe pas sur Etihad."
+                    # Supprimer automatiquement la fausse résa
+                    d2 = load_data()
+                    if code in d2:
+                        del d2[code]
+                        save_data(d2)
+                    status_text = "🚨 <b>" + code + " INTROUVABLE !</b> Cette réservation n'existe pas sur Etihad. Elle a été supprimée automatiquement."
                 else:
                     status_text = "⚠️ Impossible de vérifier <b>" + code + "</b>, réessaie dans quelques minutes."
                 show_menu(bot, chat_id, status_text)
