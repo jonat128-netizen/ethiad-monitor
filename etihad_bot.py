@@ -415,13 +415,29 @@ def handle_text(update, ctx):
             del WAITING_ADD[chat_id]
 
             delta = (flight_date - datetime.now()).days
-            show_menu(ctx.bot, chat_id,
+            ctx.bot.send_message(chat_id=chat_id, parse_mode="HTML", text=(
                 f"✅ <b>Réservation ajoutée !</b>\n\n"
                 f"✈️ Code : <b>{code}</b>\n"
                 f"👤 Passager : <b>{name}</b>\n"
                 f"📅 Vol le : <b>{text}</b> (dans {delta} jours)\n\n"
-                f"Clique sur 🔍 pour vérifier maintenant !"
-            )
+                f"⏳ Vérification en cours..."
+            ))
+
+            # Vérification automatique immédiate
+            result = check_reservation(code, name)
+            data2 = load_data()
+            data2[code]["status"] = result["status"]
+            data2[code]["last_check"] = datetime.now().strftime("%d/%m/%Y %H:%M")
+            data2[code]["detail"] = result["detail"]
+            save_data(data2)
+
+            status_text = {
+                "confirmed": "Réservation <b>confirmée</b> ✅",
+                "not_found": "🚨 Réservation <b>introuvable</b> sur Etihad ! Vérifie le code et le nom.",
+                "error": "⚠️ Impossible de vérifier pour l instant, réessaie plus tard."
+            }.get(result["status"], "Statut inconnu")
+
+            show_menu(ctx.bot, chat_id, status_text)
     else:
         show_menu(ctx.bot, chat_id)
 
