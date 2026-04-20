@@ -370,7 +370,30 @@ def handle_button(update, ctx):
             emoji = {"confirmed":"✅","not_found":"🚨","error":"⚠️","unknown":"❓"}.get(info.get("status",""),"❓")
             fd = parse_date(info.get("flight_date",""))
             delta = f" — dans {(fd-now).days}j" if fd and (fd-now).days >= 0 else ""
-            lines.append(f"{emoji} <b>{code}</b> — {info['name']}\n    └ 📅 {info.get('flight_date','?')}{delta}")
+            last_check = info.get("last_check", "jamais")
+            time_ago = ""
+            if last_check != "jamais":
+                try:
+                    lc = datetime.strptime(last_check, "%d/%m/%Y %H:%M")
+                    diff = int((now - lc).total_seconds() / 60)
+                    if diff < 1:
+                        time_ago = "à l'instant"
+                    elif diff < 60:
+                        time_ago = f"il y a {diff} min"
+                    elif diff < 1440:
+                        time_ago = f"il y a {diff // 60}h{diff % 60:02d}"
+                    else:
+                        time_ago = f"il y a {diff // 1440}j"
+                except:
+                    time_ago = last_check
+            else:
+                time_ago = "jamais"
+            lines.append(
+                f"{emoji} <b>{code}</b> — {info['name']}\n"
+                f"    └ 📅 {info.get('flight_date','?')}{delta}\n"
+                f"    └ 🕐 Vérifié {time_ago}\n"
+                f"    └ {info.get('detail','—')}"
+            )
         ctx.bot.send_message(chat_id=chat_id, parse_mode="HTML",
             text=f"📋 <b>{len(data)} réservation(s)</b>\n\n" + "\n\n".join(lines))
         show_menu(ctx.bot, chat_id)
