@@ -558,12 +558,8 @@ def auto_check_job(ctx):
         del data[code]
         log.info(f"Résa expirée supprimée : {code}")
         try:
-            ctx.bot.send_message(chat_id=CHAT_ID, parse_mode="HTML",
-                text="🗑️ <b>Réservation supprimée automatiquement</b>
-
-"
-                     "✈️ <b>" + code + "</b> — " + name + "
-Vol terminé — retiré de la liste.")
+            msg = "Reservation " + code + " (" + name + ") supprimee automatiquement. Vol termine."
+            ctx.bot.send_message(chat_id=CHAT_ID, parse_mode="HTML", text=msg)
         except:
             pass
     if to_delete:
@@ -600,4 +596,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
