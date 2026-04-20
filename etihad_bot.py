@@ -85,32 +85,30 @@ def check_reservation(code, name):
             
             page.wait_for_timeout(1000)
 
-            # Remplir les champs via JavaScript directement (bypass React)
-            page.evaluate(f"""
-                var refInput = document.querySelector('#bookingReference');
-                var nameInput = document.querySelector('#lastName');
-                if (refInput) {{
-                    var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                    nativeInputValueSetter.call(refInput, '{code.upper()}');
-                    refInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    refInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                }}
-                if (nameInput) {{
-                    var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                    nativeInputValueSetter.call(nameInput, '{name.upper()}');
-                    nameInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    nameInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                }}
-            """)
-            log.info(f"Champs remplis via JS pour {code} / {name}")
-            page.wait_for_timeout(1000)
+            # Remplir via Playwright focus/type (simule vrai clavier)
+            ref_input = page.query_selector('#bookingReference')
+            name_input = page.query_selector('#lastName')
 
-            # Cliquer le bouton Search via JavaScript
+            # Focus + type caractère par caractère comme un humain
+            page.evaluate("document.querySelector('#bookingReference').focus()")
+            page.wait_for_timeout(300)
+            page.keyboard.type(code.upper(), delay=80)
+            page.wait_for_timeout(300)
+
+            page.evaluate("document.querySelector('#lastName').focus()")
+            page.wait_for_timeout(300)
+            page.keyboard.type(name.upper(), delay=80)
+            page.wait_for_timeout(500)
+
+            log.info(f"Champs tapés clavier pour {code} / {name}")
+
+            # Cliquer le bouton Search via JS
             page.evaluate("""
                 var btn = document.querySelector('button[aria-label="Search"]');
                 if (btn) { btn.click(); }
+                else { console.log('bouton pas trouvé'); }
             """)
-            log.info(f"Bouton Search cliqué via JS pour {code} / {name}")
+            log.info(f"Bouton Search cliqué pour {code} / {name}")
 
             # Attendre que l URL change vers digital.etihad.com
             try:
