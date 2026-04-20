@@ -483,11 +483,14 @@ def handle_text(update, ctx):
                     d[code]["last_check"] = datetime.now().strftime("%d/%m/%Y %H:%M")
                     d[code]["detail"] = result["detail"]
                     save_data(d)
-                status_text = {
-                    "confirmed": f"✅ <b>{code} confirmée !</b> Réservation valide sur Etihad.",
-                    "not_found": f"🚨 <b>{code} introuvable !</b> Vérifie le code et le nom.",
-                    "error": f"⚠️ Impossible de vérifier <b>{code}</b>, réessaie dans quelques minutes."
-                }.get(result["status"], "Statut inconnu")
+                if result["status"] == "confirmed":
+                    status_text = f"✅ <b>{code} confirmée !</b>
+{result.get('detail', 'Réservation valide.')}"
+                elif result["status"] == "not_found":
+                    status_text = f"🚨 <b>{code} INTROUVABLE !</b>
+Cette réservation n existe pas sur Etihad. Vérifie le code et le nom."
+                else:
+                    status_text = f"⚠️ Impossible de vérifier <b>{code}</b> pour l instant, réessaie dans quelques minutes."
                 show_menu(bot, chat_id, status_text)
 
             threading.Thread(target=verify_bg, args=(ctx.bot, code, name, chat_id), daemon=True).start()
