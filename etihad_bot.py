@@ -639,6 +639,7 @@ def main():
 
     print("🟢 Bot actif !")
     print("CHAT_ID = " + str(CHAT_ID))
+    print("TOKEN_START = " + BOT_TOKEN[:20] if BOT_TOKEN else "TOKEN VIDE!")
     updater.start_polling()
     updater.idle()
 
