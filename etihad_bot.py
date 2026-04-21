@@ -22,8 +22,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, Filters, Updater
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-CHAT_ID   = int(os.environ.get("CHAT_ID", "0"))
-log_chat = None  # sera defini au demarrage
+CHAT_ID   = int(os.environ.get("CHAT_ID", "0")) or -5122598711
 CHECK_INTERVAL_SECONDS = 90 * 60
 STATE_FILE = "reservations.json"
 WAITING_ADD = {}
