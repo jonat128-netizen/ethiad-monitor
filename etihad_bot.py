@@ -16,6 +16,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+import requests
 from playwright.sync_api import sync_playwright
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, Filters, Updater
@@ -25,6 +26,40 @@ CHAT_ID   = int(os.environ.get("CHAT_ID", "0"))
 CHECK_INTERVAL_SECONDS = 90 * 60
 STATE_FILE = "reservations.json"
 WAITING_ADD = {}
+
+REDIS_URL   = os.environ.get("UPSTASH_REDIS_REST_URL", "")
+REDIS_TOKEN = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
+REDIS_KEY   = "etihad_reservations"
+
+def redis_save(data):
+    if not REDIS_URL:
+        return
+    try:
+        val = json.dumps(data, ensure_ascii=False)
+        requests.post(
+            REDIS_URL + "/set/" + REDIS_KEY,
+            headers={"Authorization": "Bearer " + REDIS_TOKEN},
+            json=val,
+            timeout=5
+        )
+    except Exception as e:
+        log.error("Redis save error: " + str(e))
+
+def redis_load():
+    if not REDIS_URL:
+        return None
+    try:
+        r = requests.get(
+            REDIS_URL + "/get/" + REDIS_KEY,
+            headers={"Authorization": "Bearer " + REDIS_TOKEN},
+            timeout=5
+        )
+        result = r.json().get("result")
+        if result:
+            return json.loads(result)
+    except Exception as e:
+        log.error("Redis load error: " + str(e))
+    return None
 
 logging.basicConfig(format="%(asctime)s — %(levelname)s — %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -40,12 +75,19 @@ USER_AGENTS = [
 # ══════════════════════════════════════════
 
 def load_data():
+    # Essayer Redis d abord
+    redis_data = redis_load()
+    if redis_data is not None:
+        return redis_data
+    # Fallback fichier local
     if Path(STATE_FILE).exists():
         with open(STATE_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
 def save_data(data):
+    # Sauvegarder dans Redis ET fichier local
+    redis_save(data)
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
