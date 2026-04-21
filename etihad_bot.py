@@ -19,7 +19,7 @@ from telegram.ext import (CallbackQueryHandler, CommandHandler,
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 CHAT_ID   = int(os.environ.get("CHAT_ID", "0"))
-CHECK_INTERVAL_SECONDS = 120 * 60
+CHECK_INTERVAL_SECONDS = 90 * 60
 STATE_FILE = "reservations.json"
 WAITING_ADD = {}
 
@@ -236,6 +236,37 @@ def check_all(bot, chat_id=None, silent=False):
         data[code]["status"]     = new
         data[code]["last_check"] = now
         data[code]["detail"]     = result["detail"]
+        data[code]["checkin_done"] = result.get("checkin_done", False)
+        data[code]["checkin_open"] = result.get("checkin_open", False)
+
+        # Sauvegarder après chaque vérification (survive aux redémarrages)
+        save_data(data)
+
+        # ALERTE IMMÉDIATE si introuvable — peu importe l état précédent
+        if new == "not_found":
+            alerte = (
+                "🚨🚨🚨 <b>ALERTE — RÉSERVATION DISPARUE !</b>
+
+"
+                "✈️ Code : <b>" + code + "</b>
+"
+                "👤 Passager : <b>" + info['name'] + "</b>
+"
+                "📅 Vol : <b>" + info.get('flight_date','?') + "</b>
+
+"
+                "❌ Réservation INTROUVABLE sur Etihad !
+
+"
+                "👉 https://www.etihad.com/fr-fr/manage"
+            )
+            for _ in range(3):
+                try:
+                    bot.send_message(chat_id=CHAT_ID, parse_mode="HTML", text=alerte)
+                    time.sleep(2)
+                except:
+                    pass
+            log.info("ALERTE 3x envoyée pour " + code)
 
         if prev == "confirmed" and new == "not_found":
             bot.send_message(chat_id=CHAT_ID, parse_mode="HTML", text=(
@@ -402,7 +433,7 @@ def handle_button(update, ctx):
                 badge = "🚨 INTROUVABLE"
             elif info.get("checkin_done", False):
                 badge = "✈️ CHECK-IN EFFECTUÉ"
-            elif info.get("checkin_open_notified", False):
+            elif info.get("checkin_open", False):
                 badge = "🛫 CHECK-IN OUVERT"
             elif info.get("status") == "confirmed":
                 badge = "✅ CONFIRMÉE"
