@@ -21,8 +21,8 @@ from playwright.sync_api import sync_playwright
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, Filters, Updater
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-CHAT_ID   = int(os.environ.get("CHAT_ID", "0")) or -5122598711
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8050428318:AAFTfUrl8dvyDh1DS1E2smMTTfIDlp8HLpk")
+CHAT_ID   = -5122598711
 CHECK_INTERVAL_SECONDS = 90 * 60
 STATE_FILE = "reservations.json"
 WAITING_ADD = {}
@@ -644,3 +644,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
