@@ -581,7 +581,8 @@ def handle_text(update, ctx):
                     status_text = "🚨 <b>" + code + " INTROUVABLE !</b> Cette reservation n'existe pas sur Etihad. Elle a ete supprimee."
                 else:
                     status_text = "⚠️ Impossible de verifier <b>" + code + "</b>, reessaie dans quelques minutes."
-                show_menu(bot, chat_id, status_text)
+                # Toujours envoyer au CHAT_ID du groupe
+                show_menu(bot, CHAT_ID, status_text)
 
             threading.Thread(target=verify_bg, args=(ctx.bot, code, name, chat_id), daemon=True).start()
     else:
