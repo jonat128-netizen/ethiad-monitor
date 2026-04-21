@@ -23,6 +23,7 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, F
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 CHAT_ID   = int(os.environ.get("CHAT_ID", "0"))
+log_chat = None  # sera defini au demarrage
 CHECK_INTERVAL_SECONDS = 90 * 60
 STATE_FILE = "reservations.json"
 WAITING_ADD = {}
@@ -638,6 +639,7 @@ def main():
     jq.run_repeating(checkin_alerts, interval=3600, first=120)
 
     print("🟢 Bot actif !")
+    print("CHAT_ID = " + str(CHAT_ID))
     updater.start_polling()
     updater.idle()
 
