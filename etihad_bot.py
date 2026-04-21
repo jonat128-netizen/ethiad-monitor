@@ -156,8 +156,18 @@ def check_reservation(code, name):
                 return {"status": "not_found", "detail": "Réservation introuvable sur Etihad"}
 
             if any(k in page_text for k in success_kw):
-                checkin_done = "déjà enregistré" in page_text or "already checked in" in page_text or "carte d'embarquement" in page_text
-                checkin_open = ("enregistrement" in page_text or "check-in" in page_text) and not checkin_done
+                checkin_done = (
+                    "vous êtes déjà enregistré" in page_text or
+                    "already checked in" in page_text or
+                    "carte d'embarquement" in page_text or
+                    "boarding pass" in page_text or
+                    "enregistrement terminé" in page_text
+                )
+                checkin_open = (
+                    "l'enregistrement se termine" in page_text or
+                    "enregistrement en ligne est disponible" in page_text or
+                    "check-in is open" in page_text
+                ) and not checkin_done
 
                 # Extraire destination si possible
                 detail = "Réservation confirmée ✅"
