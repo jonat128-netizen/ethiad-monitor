@@ -104,11 +104,18 @@ def check_reservation(code, name):
             else:
                 name_input.press("Enter")
 
+            url_changed = False
             try:
                 page.wait_for_url("*digital.etihad.com*", timeout=20000)
                 log.info("URL changee: " + page.url)
+                url_changed = True
             except:
                 log.info("URL pas changee: " + page.url)
+
+            # Si URL pas changee = formulaire pas soumis ou resa invalide
+            if not url_changed:
+                browser.close()
+                return {"status": "not_found", "detail": "Reservation introuvable sur Etihad", "checkin_open": False, "checkin_done": False}
 
             page.wait_for_timeout(6000)
             page_text = page.inner_text("body").lower()
